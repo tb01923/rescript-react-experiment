@@ -6,16 +6,18 @@ type file = {"name": string, "lastModified": int, "size": int, "type__": string}
 @bs.send
 external readAsDataURL: (fileReader, file) => unit = "readAsDataURL"
 
-let onload: (fileReader, string => unit) => unit = %raw(`
-    function (reader, cb) {
+let handleRead: (fileReader, (. string)=> unit, (. _) => unit) => unit = %raw(`
+    function (reader, resolve, reject) {
       reader.onload = function (e) {
-        cb(e.target.result);
+        resolve(e.target.result);
       }
+      reader.onerror = () => reject(reader.error)
     }
 `)
 
-let fileToDataUrl = (file: file, continue: string => unit) => {
-    let reader = createFileReader()
-    onload(reader, continue)
-    readAsDataURL(reader, file)
-}
+let fileToDataUrl = (file: file) =>
+    Js.Promise.make((~resolve, ~reject) => {
+        let reader = createFileReader()
+        handleRead(reader, resolve, reject)
+        readAsDataURL(reader, file)
+    })
