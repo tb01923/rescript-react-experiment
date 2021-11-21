@@ -1,38 +1,50 @@
 open FileReader
 open ImageResize
-open Js.Promise
+open Promise
 
+type action =
+    NewFile({originalDataUrl: string, resizedDataUrl: string})
 
+type state = {
+    originalDataUrl: string,
+    resizedDataUrl: string
+}
 
-let getFirstFileWithEvent = event => ReactEvent.Form.target(event)["files"][0]
+let reducer = (_, action) => {
+    switch action {
+        | NewFile({originalDataUrl, resizedDataUrl}) => {originalDataUrl, resizedDataUrl}
+    }
+}
+
+let initialState = {originalDataUrl: "", resizedDataUrl: ""}
+let getFirstFileFromEvent = event => ReactEvent.Form.target(event)["files"][0]
 
 @react.component
 let make = () => {
-    let k = x => (_ => x)
-    let (resizeDataUrl, setResizeDataUrl) = React.useState(k(""))
-    let (dataUrl, setDataUrl) = React.useState(k(""))
-    let setStateWithIdPromise = hook => obj => {
-        hook(_ => obj)
-        resolve(obj)
-    }
-    // let resizePeromise = newDataUrl => resize(newDataUrl) -> resolve
-    let setDataUrlStatePromise = setStateWithIdPromise(setDataUrl)
-    let setResizeDataUrlStatePromise = setStateWithIdPromise(setResizeDataUrl)
 
-    let onFileOnChange = event =>
-        event ->
-            getFirstFileWithEvent ->
+    let (state, dispatch) = React.useReducer(reducer, initialState)
+    let asNewFileAction = ({originalDataUrl, resizedDataUrl}) =>
+        NewFile({originalDataUrl: originalDataUrl, resizedDataUrl: resizedDataUrl})
+
+    let resizeAndKeepOriginalDataUrl =  originalDataUrl =>
+        originalDataUrl ->
+            resizePromise ->
+            thenResolve(resizedDataUrl => {{originalDataUrl, resizedDataUrl}})
+
+    let onFileChange = e =>
+        e ->
+            getFirstFileFromEvent ->
             fileToDataUrl ->
-            then_(setDataUrlStatePromise, _) ->
-            then_(resizePromise, _) ->
-            then_(setResizeDataUrlStatePromise, _) ->
+            then(resizeAndKeepOriginalDataUrl) ->
+            thenResolve(asNewFileAction) ->
+            thenResolve(dispatch) ->
             ignore
 
     <div>
-        <input type_="file" onChange=onFileOnChange/>
+        <input type_="file" onChange=onFileChange/>
         <br/>
-        <img src=resizeDataUrl/>
+        <img src=state.resizedDataUrl/>
         <hr/>
-        <img src=dataUrl/>
+        <img src=state.originalDataUrl/>
     </div>
 }
